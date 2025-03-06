@@ -1,11 +1,20 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
-from xz import *
+from n_parser import *
 import uvicorn
 
 
-app = FastAPI()
-BASE_URL = "https://islom.uz/region/"
+
+app = FastAPI(
+    title="NamozAPI.uz - Namoz vaqtlari - Prayer times",
+    description="""API для получения времени намаза  
+API for getting prayer times""",
+    version="1.0.0",
+    contact={
+        "name": "Developer",
+        "url": "https://t.me/Haker4ik"
+    }
+)
 
 
 @app.get("/", include_in_schema=False)
@@ -20,11 +29,11 @@ async def get_namoz_times(region_id: int):
     return times
 
 
-@app.get("/namoz/regions")
+@app.get("/regions")
 async def get_all_regions():
-        res = await all_regions()
-        regions = json.loads(res)
-        return regions
+    res = await all_regions()
+    regions = json.loads(res)
+    return regions
 
 
 @app.exception_handler(404)
