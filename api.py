@@ -49,5 +49,5 @@ async def not_found(request: Request, exc: Exception):
     return JSONResponse(status_code=404, content={"detail": "Not Found", "support": "@Haker4ik"})
 
 
-# if __name__ == '__main__':
-#     uvicorn.run(app, host='0.0.0.0', port=8055)
+if __name__ == '__main__':
+    uvicorn.run(app, host='0.0.0.0', port=80)
