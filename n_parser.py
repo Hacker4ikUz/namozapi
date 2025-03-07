@@ -2,17 +2,78 @@ import aiohttp
 from bs4 import BeautifulSoup
 import json
 import asyncio
+import random
 
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://islom.uz/"
+}
 
-async def all_regions():
-    url = "https://islom.uz/region/1"
-    headers = {"User-Agent": "Mozilla/5.0"}
+class NamozParser:
+    def __init__(self):
+        self.session = None
 
-    for _ in range(3):
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, timeout=10) as resp:
+    async def init_session(self):
+        if not self.session:
+            self.session = aiohttp.ClientSession(
+                connector=aiohttp.TCPConnector(limit=5),
+                timeout=aiohttp.ClientTimeout(total=30)
+            )
+
+    async def close_session(self):
+        if self.session:
+            await self.session.close()
+            self.session = None
+
+    async def namoz_vaqti(self, region_id: int):
+        await self.init_session()
+        url = f"https://islom.uz/region/{region_id}"
+
+        for _ in range(3):
+            try:
+                async with self.session.get(url, headers=HEADERS) as resp:
                     if resp.status != 200:
+                        await asyncio.sleep(random.uniform(1, 3))
+                        continue
+
+                    html = await resp.text()
+                    soup = BeautifulSoup(html, "lxml")
+
+                    def get_date(class_name):
+                        tag = soup.find('div', class_=class_name)
+                        return tag.text.strip() if tag else "N/A"
+
+                    def safe_find(id):
+                        tag = soup.find('div', id=id)
+                        return tag.text.strip() if tag else "N/A"
+
+                    return json.dumps({
+                        "date": get_date("date_time"),
+                        "bomdod": safe_find("tc1"),
+                        "quyosh": safe_find("tc2"),
+                        "peshin": safe_find("tc3"),
+                        "asr": safe_find("tc4"),
+                        "shom": safe_find("tc5"),
+                        "xufton": safe_find("tc6"),
+                        "developer": "@Haker4ik"
+                    }, ensure_ascii=False, indent=4)
+
+            except (aiohttp.ClientError, asyncio.TimeoutError):
+                await asyncio.sleep(random.uniform(2, 5))
+
+        return json.dumps({"error": "Failed to fetch prayer times"}, ensure_ascii=False, indent=4)
+    
+
+    async def all_regions(self):
+        await self.init_session()
+        url = "https://islom.uz/region/1"
+
+        for _ in range(3):
+            try:
+                async with self.session.get(url, headers=HEADERS) as resp:
+                    if resp.status != 200:
+                        await asyncio.sleep(random.uniform(1, 3))
                         continue
 
                     html = await resp.text()
@@ -31,51 +92,10 @@ async def all_regions():
 
                     return json.dumps(region_data, ensure_ascii=False, indent=4)
 
-        except aiohttp.ClientError:
-            await asyncio.sleep(2)
+            except (aiohttp.ClientError, asyncio.TimeoutError):
+                await asyncio.sleep(random.uniform(2, 5))
 
-    return json.dumps({"error": "Failed to fetch regions"}, ensure_ascii=False, indent=4)
-
-
-async def namoz_vaqti(region_id: int):
-    url = f"https://islom.uz/region/{region_id}"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    
-    for _ in range(3):
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, timeout=10) as resp:
-                    if resp.status != 200:
-                        continue
-
-                    html = await resp.text()
-                    soup = BeautifulSoup(html, "lxml")
-
-                    def safe_find(id):
-                        tag = soup.find('div', id=id)
-                        return tag.text.strip() if tag else "N/A"
-
-                    times = {
-                        "date": safe_find("date_time"),
-                        "bomdod": safe_find("tc1"),
-                        "quyosh": safe_find("tc2"),
-                        "peshin": safe_find("tc3"),
-                        "asr": safe_find("tc4"),
-                        "shom": safe_find("tc5"),
-                        "xufton": safe_find("tc6"),
-                        "developer": "@Haker4ik"
-                    }
-                    return json.dumps(times, ensure_ascii=False, indent=4)
-        except aiohttp.ClientError:
-            await asyncio.sleep(2)
-
-    return json.dumps({"error": "Failed to fetch prayer times"}, ensure_ascii=False, indent=4)
+        return json.dumps({"error": "Failed to fetch regions"}, ensure_ascii=False, indent=4)
 
 
-
-# import asyncio
-# asyncio.run(all_regions())
-# asyncio.run(namoz_vaqti(18))
-        
-
-
+namoz_parser = NamozParser()
