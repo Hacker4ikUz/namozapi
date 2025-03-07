@@ -1,18 +1,21 @@
 import aiohttp
-from bs4 import BeautifulSoup
-import json
 import asyncio
+import json
 import random
+from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Referer": "https://islom.uz/"
-}
+
+HEADERS = {"User-Agent": "Mozilla/5.0"}
+
 
 class NamozParser:
     def __init__(self):
         self.session = None
+        self.last_updated_times = None
+        self.cached_times = {}
+        self.last_updated_regions = None
+        self.cached_regions = {}
 
     async def init_session(self):
         if not self.session:
@@ -27,6 +30,11 @@ class NamozParser:
             self.session = None
 
     async def namoz_vaqti(self, region_id: int):
+        today = datetime.now().date()
+        
+        if self.last_updated_times == today and region_id in self.cached_times:
+            return self.cached_times[region_id]
+
         await self.init_session()
         url = f"https://islom.uz/region/{region_id}"
 
@@ -48,7 +56,7 @@ class NamozParser:
                         tag = soup.find('div', id=id)
                         return tag.text.strip() if tag else "N/A"
 
-                    return json.dumps({
+                    data = json.dumps({
                         "date": get_date("date_time"),
                         "bomdod": safe_find("tc1"),
                         "quyosh": safe_find("tc2"),
@@ -59,13 +67,21 @@ class NamozParser:
                         "developer": "@Haker4ik"
                     }, ensure_ascii=False, indent=4)
 
+                    self.cached_times[region_id] = data
+                    self.last_updated_times = today
+                    return data
+
             except (aiohttp.ClientError, asyncio.TimeoutError):
                 await asyncio.sleep(random.uniform(2, 5))
 
         return json.dumps({"error": "Failed to fetch prayer times"}, ensure_ascii=False, indent=4)
-    
 
     async def all_regions(self):
+        today = datetime.now().date()
+
+        if self.last_updated_regions == today and self.cached_regions:
+            return self.cached_regions
+
         await self.init_session()
         url = "https://islom.uz/region/1"
 
@@ -90,7 +106,9 @@ class NamozParser:
                             "region_id": int(option['value'])
                         }
 
-                    return json.dumps(region_data, ensure_ascii=False, indent=4)
+                    self.cached_regions = json.dumps(region_data, ensure_ascii=False, indent=4)
+                    self.last_updated_regions = today
+                    return self.cached_regions
 
             except (aiohttp.ClientError, asyncio.TimeoutError):
                 await asyncio.sleep(random.uniform(2, 5))
