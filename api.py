@@ -1,11 +1,20 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+from contextlib import asynccontextmanager
 from n_parser import *
 import uvicorn
 
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await namoz_parser.init_session()
+    yield
+    await namoz_parser.close_session()
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="NamozAPI.uz - Namoz vaqtlari - Prayer times",
     description="""API для получения времени намаза  
 API for getting prayer times""",
@@ -24,16 +33,15 @@ async def redirect_to_docs():
 
 @app.get("/namoz/{region_id}")
 async def get_namoz_times(region_id: int):
-    res = await namoz_vaqti(region_id)
+    res = await namoz_parser.namoz_vaqti(region_id)
     times = json.loads(res)
     return times
 
 
 @app.get("/regions")
 async def get_all_regions():
-    res = await all_regions()
-    regions = json.loads(res)
-    return regions
+    res = await namoz_parser.all_regions()
+    return json.loads(res)
 
 
 @app.exception_handler(404)
@@ -41,5 +49,5 @@ async def not_found(request: Request, exc: Exception):
     return JSONResponse(status_code=404, content={"detail": "Not Found", "support": "@Haker4ik"})
 
 
-if __name__ == '__main__':
-    uvicorn.run(app, host='0.0.0.0', port=80)
+# if __name__ == '__main__':
+#     uvicorn.run(app, host='0.0.0.0', port=8055)
